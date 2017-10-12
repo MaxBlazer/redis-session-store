@@ -117,10 +117,9 @@ class RedisSessionStore < ActionDispatch::Session::AbstractStore
   def set_session(env, sid, session_data, options = nil)
     expiry = (options || env.fetch(ENV_SESSION_OPTIONS_KEY))[:expire_after]
     if expiry
-      redis.setex(prefixed(sid), expiry, encode(session_data))
-    else
-      redis.set(prefixed(sid), encode(session_data))
+      redis.setex("shadowkey:" + prefixed(sid), expiry, "")
     end
+    redis.set(prefixed(sid), encode(session_data))
     return sid
   rescue Errno::ECONNREFUSED, Redis::CannotConnectError => e
     on_redis_down.call(e, env, sid) if on_redis_down
@@ -147,6 +146,7 @@ class RedisSessionStore < ActionDispatch::Session::AbstractStore
 
   def destroy_session_from_sid(sid, options = {})
     redis.del(prefixed(sid))
+    redis.del("shadowkey:" + prefixed(sid))
     (options || {})[:drop] ? nil : generate_sid
   rescue Errno::ECONNREFUSED, Redis::CannotConnectError => e
     on_redis_down.call(e, options[:env] || {}, sid) if on_redis_down
